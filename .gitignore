@@ -1,0 +1,5 @@
+node_modules
+.env
+.next
+firebase-admin.json
+google-sheets-api-credentials.json
