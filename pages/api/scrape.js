@@ -1,63 +1,38 @@
-import fetch from 'node-fetch';
-import * as cheerio from 'cheerio';
-import { appendToSheet } from '../../utils/googleSheets';
+import { db, collection, addDoc, getCountFromServer } from "../../lib/firebase";
+import puppeteer from "puppeteer";
 
-// Function to get Shopify stores from MyIP.ms
-const getShopifyStores = async () => {
-  const url = 'https://myip.ms/browse/sites/1/owned_by_Shopify_Inc/1';
-  const response = await fetch(url);
-  const html = await response.text();
-  const $ = cheerio.load(html);
-
-  let stores = [];
-  $('tr[class^="row"] td:nth-child(1) a').each((i, el) => {
-    const domain = $(el).text().trim();
-    if (domain.includes('.')) {
-      stores.push({ domain });
-    }
-  });
-
-  return stores.slice(0, 10); // Limit to 10 stores per run
-};
-
-// Function to get emails from website
-const getEmailsFromWebsite = async (domain) => {
-  try {
-    const response = await fetch(`https://${domain}`);
-    const html = await response.text();
-    const $ = cheerio.load(html);
-
-    const emails = [];
-    $('a[href^="mailto:"]').each((i, el) => {
-      const email = $(el).attr('href').replace('mailto:', '').trim();
-      if (email.includes('@gmail.com')) {
-        emails.push(email);
-      }
-    });
-
-    return emails.length ? emails : ['No email found'];
-  } catch (error) {
-    return ['Error fetching website'];
-  }
-};
-
-// API Route
 export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method Not Allowed" });
+  }
+
+  const searchQuery = req.body.query || "store";
+  const maxLeads = 1000;
   try {
-    const stores = await getShopifyStores();
-    const data = [];
-
-    for (const store of stores) {
-      const emails = await getEmailsFromWebsite(store.domain);
-      const row = [store.domain, ...emails]; // Add domain and emails to the row
-      data.push(row);
-
-      // Append to Google Sheets
-      await appendToSheet(data);
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.goto(`https://myip.ms/browse/sites/${searchQuery}`);
+    
+    const data = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll("table tr"))
+        .map(row => {
+          const cols = row.querySelectorAll("td");
+          return cols.length > 2 ? { name: cols[1]?.innerText, email: cols[2]?.innerText } : null;
+        })
+        .filter(entry => entry && entry.email.includes("@gmail.com"));
+    });
+    
+    await browser.close();
+    
+    for (const lead of data) {
+      const leadsRef = collection(db, "leads");
+      const countSnapshot = await getCountFromServer(leadsRef);
+      if (countSnapshot.data().count >= maxLeads) break;
+      await addDoc(leadsRef, lead);
     }
-
-    res.status(200).json({ message: 'Scraping done', newLeads: stores.length });
+    
+    res.status(200).json({ message: "Scraping completed and leads saved." });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to scrape data' });
+    res.status(500).json({ error: error.message });
   }
 }
