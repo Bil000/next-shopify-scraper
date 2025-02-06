@@ -1,6 +1,5 @@
-// lib/firestore.js
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, collection, addDoc } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,12 +14,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-export { db };
-
-// utils/firestore.js
-import { db } from "@/lib/firestore";
-import { collection, addDoc } from "firebase/firestore";
-
 export async function saveLead(lead) {
   try {
     const docRef = await addDoc(collection(db, "leads"), lead);
@@ -31,3 +24,5 @@ export async function saveLead(lead) {
     return null;
   }
 }
+
+export { db };

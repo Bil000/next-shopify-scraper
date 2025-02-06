@@ -1,4 +1,4 @@
-import { saveLead } from "@/utils/firestore";
+import { db, saveLead } from "../../utils/firestore"; // ✅ Only one import
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
