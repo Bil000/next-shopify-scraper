@@ -1,4 +1,5 @@
 import { db, saveLead } from "../../utils/firestore"; // ✅ Only one import
+import "dotenv/config";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {

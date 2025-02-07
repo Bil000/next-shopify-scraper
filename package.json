@@ -8,6 +8,7 @@
         "start": "next start"
     },
     "dependencies": {
+        "dotenv": "^16.4.7",
         "firebase": "^10.7.0",
         "next": "latest",
         "puppeteer": "^21.7.0",
